@@ -173,6 +173,8 @@ var (
 	// Mirror origin global setting (should be per destination eventually).
 	mirrorOriginFlag = flag.Bool("multi-mirror-origin", true, "Mirror the request url to the target for multi proxies (-M)")
 	multiSerialFlag  = flag.Bool("multi-serial-mode", false, "Multi server (-M) requests one at a time instead of parallel mode")
+	// option to discard HTTP response
+	discardBodyFlag = flag.Bool("discard-body", false, "Discard HTTP response body")
 )
 
 func main() {
@@ -322,6 +324,7 @@ func fortioLoad(justCurl bool, percList []float64) {
 		usageErr("Error: fortio load/curl needs a url or destination")
 	}
 	httpOpts := bincommon.SharedHTTPOptions()
+	httpOpts.DiscardBody = *discardBodyFlag
 	if *httpsInsecureFlag {
 		httpOpts.Insecure = true
 	}

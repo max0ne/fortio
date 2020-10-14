@@ -176,6 +176,7 @@ type HTTPOptions struct {
 	UserCredentials string // user credentials for authorization
 	ContentType     string // indicates request body type, implies POST instead of GET
 	Payload         []byte // body for http request, implies POST if not empty.
+	DiscardBody     bool   // discard HTTP response
 
 	UnixDomainSocket string // Path of unix domain socket to use instead of host:port from URL
 }
@@ -291,10 +292,11 @@ func newHTTPRequest(o *HTTPOptions) *http.Request {
 // Client object for making repeated requests of the same URL using the same
 // http client (net/http).
 type Client struct {
-	url       string
-	req       *http.Request
-	client    *http.Client
-	transport *http.Transport
+	url         string
+	req         *http.Request
+	client      *http.Client
+	transport   *http.Transport
+	discardBody bool
 }
 
 // Close cleans up any resources used by NewStdClient.
@@ -337,7 +339,19 @@ func (c *Client) Fetch() (int, []byte, int) {
 			log.Debugf("For URL %s, received:\n%s", c.url, data)
 		}
 	}
-	data, err = ioutil.ReadAll(resp.Body)
+	if !c.discardBody {
+		data, err = ioutil.ReadAll(resp.Body)
+	} else {
+		buf := make([]byte, 1024*4)
+		var readErr error
+		for readErr == nil {
+			_, readErr = resp.Body.Read(buf)
+		}
+		if readErr != io.EOF {
+			err = readErr
+		}
+	}
+
 	resp.Body.Close()
 	if err != nil {
 		log.Errf("Unable to read response for %s : %v", c.url, err)
@@ -400,7 +414,8 @@ func NewStdClient(o *HTTPOptions) *Client {
 			Timeout:   o.HTTPReqTimeOut,
 			Transport: &tr,
 		},
-		transport: &tr,
+		transport:   &tr,
+		discardBody: o.DiscardBody,
 	}
 	if !o.FollowRedirects {
 		// Lets us see the raw response instead of auto following redirects.
