@@ -10,7 +10,7 @@ RUN make -C fortio official-build BUILD_DIR=/build OFFICIAL_BIN=../fortio_go_lat
 # Windows release, for now assumes running from fortio directory (static resources in .)
 RUN make -C fortio official-build BUILD_DIR=/build LIB_DIR=. OFFICIAL_BIN=../fortio.exe GOOS=windows
 # Minimal image with just the binary and certs
-FROM scratch as release
+FROM alpine as release
 # NOTE: the list of files here, if updated, must be changed in release/Dockerfile.in too
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # TODO: get rid of *.bak, *~ and other spurious non source files
