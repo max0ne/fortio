@@ -292,11 +292,11 @@ func newHTTPRequest(o *HTTPOptions) *http.Request {
 // Client object for making repeated requests of the same URL using the same
 // http client (net/http).
 type Client struct {
-	url         string
-	req         *http.Request
-	client      *http.Client
-	transport   *http.Transport
-	discardBody bool
+	url       string
+	req       *http.Request
+	client    *http.Client
+	transport *http.Transport
+	options   *HTTPOptions
 }
 
 // Close cleans up any resources used by NewStdClient.
@@ -325,8 +325,14 @@ func (c *Client) ChangeURL(urlStr string) (err error) {
 
 // Fetch fetches the byte and code for pre created client.
 func (c *Client) Fetch() (int, []byte, int) {
-	// req can't be null (client itself would be null in that case)
-	resp, err := c.client.Do(c.req)
+	// have to make a copy of req, because if the previous response is not fully read,
+	// HTTP transport fails subsequent http requests made using the same request object
+	req := newHTTPRequest(c.options)
+	if req == nil {
+		log.Errf("Unable to create request for %s", c.url)
+		return 0, nil, 0
+	}
+	resp, err := c.client.Do(req)
 	if err != nil {
 		log.Errf("Unable to send %s request for %s : %v", c.req.Method, c.url, err)
 		return http.StatusBadRequest, []byte(err.Error()), 0
@@ -339,7 +345,7 @@ func (c *Client) Fetch() (int, []byte, int) {
 			log.Debugf("For URL %s, received:\n%s", c.url, data)
 		}
 	}
-	if !c.discardBody {
+	if !c.options.DiscardBody {
 		data, err = ioutil.ReadAll(resp.Body)
 	} else {
 		buf := make([]byte, 1024*4)
@@ -414,8 +420,8 @@ func NewStdClient(o *HTTPOptions) *Client {
 			Timeout:   o.HTTPReqTimeOut,
 			Transport: &tr,
 		},
-		transport:   &tr,
-		discardBody: o.DiscardBody,
+		transport: &tr,
+		options:   o,
 	}
 	if !o.FollowRedirects {
 		// Lets us see the raw response instead of auto following redirects.
